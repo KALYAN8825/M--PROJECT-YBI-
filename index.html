@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eye Disease Detection</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='Styles.css') }}">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <h1>Eye Disease Detection System</h1>
+  </header>
+
+  <div class="main-grid">
+
+    <!-- Upload Image -->
+    <div class="box upload-box">
+      <h2>Upload an Eye Image</h2>
+      <input type="file" id="fileInput" accept="image/*"><br>
+      <img id="preview" alt="Selected Image" style="display:none;">
+      <br>
+      <button onclick="uploadImage()">Predict</button>
+    </div>
+
+    <!-- Image-Based Prediction Result -->
+    <div class="box result-box" id="infoBoxImage" style="display: none;">
+      <h3>Image-Based Diagnosis</h3>
+      <p><strong>Predicted Disease:</strong> <span id="infoDiseaseImage"></span></p>
+      <p><strong>Accuracy:</strong> <span id="accuracyImage"></span></p>
+      <p><strong>Symptoms:</strong> <span id="symptomsImage"></span></p>
+      <p><strong>Cure:</strong> <span id="cureImage"></span></p>
+      <p><strong>Medication:</strong> <span id="medicationImage"></span></p>
+    </div>
+
+    <!-- Symptom-Based Diagnosis -->
+    <div class="box symptom-box">
+      <h2>Diagnose by Symptoms</h2>
+      <div class="symptom-container">
+        <h3>Select Symptoms:</h3>
+        <form id="symptomForm">
+          <label><input type="checkbox" name="symptom" value="blurred_vision"> Blurred Vision</label><br>
+          <label><input type="checkbox" name="symptom" value="eye_pain"> Eye Pain</label><br>
+          <label><input type="checkbox" name="symptom" value="redness"> Redness</label><br>
+          <label><input type="checkbox" name="symptom" value="dry_eyes"> Dry Eyes</label><br>
+          <label><input type="checkbox" name="symptom" value="floaters"> Floaters</label><br>
+          <label><input type="checkbox" name="symptom" value="light_sensitivity"> Light Sensitivity</label><br>
+          <button type="submit">Check Disease</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Symptom-Based Prediction Result -->
+    <div class="box result-box" id="infoBoxSymptom" style="display: none;">
+      <h2>Symptom-Based Diagnosis</h2>
+      <p><strong>Disease:</strong> <span id="infoDiseaseSymptom"></span></p>
+      <p><strong>Symptoms:</strong> <span id="symptomsSymptom"></span></p>
+      <p><strong>Cure:</strong> <span id="cureSymptom"></span></p>
+      <p><strong>Medication:</strong> <span id="medicationSymptom"></span></p>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loading" style="display: none; text-align: center; margin-top: 20px;">
+      <img src="{{ url_for('static', filename='spinner.gif') }}" alt="Loading..." style="width: 60px; filter: drop-shadow(0 0 6px cyan);">
+      <p style="color: #ffffff; font-size: 14px;">Analyzing image...</p>
+    </div>
+  </div>
+
+  <div class="circuit-intro" id="circuitIntro"></div>
+
+  <!-- Footer -->
+  <footer>
+    <p> Advanced Python Programming Lab External </p>
+  </footer>
+
+  <!-- JavaScript Section -->
+  <script>
+    // Handle Image Upload
+    function uploadImage() {
+      const file = document.getElementById("fileInput").files[0];
+      if (!file) {
+        alert("Please select an image.");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      document.getElementById("loading").style.display = "block";
+      document.getElementById("infoBoxImage").style.display = "none";
+
+      fetch("/predict", {
+        method: "POST",
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("loading").style.display = "none";
+        document.getElementById("infoBoxImage").style.display = "block";
+
+        document.getElementById("infoDiseaseImage").innerText = data.class_name;
+        document.getElementById("accuracyImage").innerText = (data.confidence * 100).toFixed(2) + "%";
+        document.getElementById("symptomsImage").innerText = data.symptoms;
+        document.getElementById("cureImage").innerText = data.cure;
+        document.getElementById("medicationImage").innerText = data.medication;
+
+        const infoBox = document.getElementById("infoBoxImage");
+        infoBox.style.animation = "none";
+        void infoBox.offsetWidth;
+        infoBox.style.animation = "fadeInUp 0.6s ease forwards";
+      })
+      .catch(err => {
+        document.getElementById("loading").style.display = "none";
+        alert("Error predicting image.");
+        console.error(err);
+      });
+    }
+
+    // Preview selected image
+    document.getElementById("fileInput").addEventListener("change", function () {
+      const file = this.files[0];
+      const preview = document.getElementById("preview");
+
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          preview.src = e.target.result;
+          preview.style.display = "block";
+        };
+        reader.readAsDataURL(file);
+      } else {
+        preview.src = "";
+        preview.style.display = "none";
+      }
+    });
+
+    // Handle Symptom-Based Diagnosis
+    document.getElementById("symptomForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+
+      const checkboxes = document.querySelectorAll('input[name="symptom"]:checked');
+      const selectedSymptoms = Array.from(checkboxes).map(cb => cb.value);
+
+      if (selectedSymptoms.length === 0) {
+        alert("Please select at least one symptom.");
+        return;
+      }
+
+      fetch("/diagnose", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ symptoms: selectedSymptoms })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("infoBoxSymptom").style.display = "block";
+
+        document.getElementById("infoDiseaseSymptom").innerText = data.predicted_disease;
+        document.getElementById("symptomsSymptom").innerText = selectedSymptoms.join(", ");
+        document.getElementById("cureSymptom").innerText = data.cure;
+        document.getElementById("medicationSymptom").innerText = data.medication;
+      })
+      .catch(err => {
+        console.error(err);
+        alert("Symptom diagnosis failed.");
+      });
+    });
+  </script>
+
+</body>
+</html>
